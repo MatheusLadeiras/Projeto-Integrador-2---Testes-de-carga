@@ -1,0 +1,197 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam shadowing false
+skinparam roundcorner 6
+
+' Espaçamentos calibrados para o layout horizontal
+skinparam nodesep 70
+skinparam ranksep 70
+skinparam wrapWidth 220
+skinparam maxMessageSize 150
+
+' ==========================================
+' NÍVEL SUPERIOR
+' ==========================================
+class Usuario {
+    + cpf : String
+    + email : String
+    - idUsuario : Int
+    - nomeCompleto : String
+    - hashSenha : String
+    - saldoDisponivel : Float = 0.00
+    - saldoBloqueado : Float = 0.00
+    - reputacaoVendas : Float = 5.0
+    - role: RoleUsuario
+    + creditarSaldo(valor : Float) : void
+    + bloquearSaldo(valor : Float) : void
+}
+
+class Categoria {
+    + slugCategoria : String
+    - nome : String
+    - descricao : String
+}
+
+' ==========================================
+' ESPINHA DORSAL (Fluxo da Esquerda para a Direita)
+' ==========================================
+class ModeloHardware {
+    + idParte : Int
+    - fabricante : String
+    - linhaModelo : String
+    - especificacaoTecnica : String
+    - precoMedianoHistorico : Float
+    + recalcularMediana30Dias() : Float
+}
+
+class Anuncio {
+    + codigoAnuncio : String
+    - titulo : String
+    - precoVenda : Float
+    - aliquotaTaxaAplicada : Float
+    - valorTaxaPlataforma : Float
+    - valorLiquidoVendedor : Float
+    - estadoItem : EstadoConservacao
+    - status : StatusAnuncio = ATIVO
+    + calcularTaxaAntiscalping(mediana : Float) : void
+}
+
+class Pedido {
+    + idPedido : Int
+    - dataHoraCriacao : DateTime
+    - valorTotalTransacao : Float
+    - status : StatusPedido = AGUARDANDO_ENVIO
+    - dataLimiteHomologacao : DateTime
+    + iniciarJanelaHomologacao48h() : void
+}
+
+class Disputa {
+    + protocoloDisputa : String
+    - motivo : MotivoDisputa
+    - relatorioComprador : String
+    - dataAbertura : DateTime
+    - status : StatusDisputa = ABERTA
+    - veredito : VereditoDisputa = PENDENTE
+    + emitirParecer(veredito, justificativa) : void
+}
+
+' Conexões Horizontais (O segredo para não sobrepor)
+ModeloHardware "1\n+modeloReferencia" <-right- "0..*\n+anunciosDoModelo" Anuncio
+Anuncio "1\n+anuncioVendido" <-right- "0..1\n+pedidoOrigem" Pedido
+Pedido "1\n+pedidoEmLitigio" <-right- "0..1\n+disputaAberta" Disputa
+
+' ==========================================
+' CONEXÕES COM O USUÁRIO (Efeito Leque)
+' ==========================================
+Usuario "1\n+vendedorTitular" <-- "0..*\n+anunciosPublicados" Anuncio
+Usuario "1\n+comprador" <-- "0..*\n+comprasRealizadas" Pedido
+Usuario "0..1\n+moderador" <-- "0..*\n+disputasMediadas" Disputa
+
+' Conexão da Categoria (Acima do Modelo)
+Categoria "1\n+categoriaPai" <-up- "0..*\n+modelosSubordinados" ModeloHardware
+
+' ==========================================
+' AGREGADOS INFERIORES (Abaixo da Linha Central)
+' ==========================================
+class ContaCustodia {
+    + idCustodiaTransacao : Int
+    - montanteRetido : Float
+    - status : StatusCustodia = RETIDA
+    + congelarPorDisputa() : void
+    + liberarAoVendedor() : void
+    + estornarAoComprador() : void
+}
+
+class Envio {
+    + codigoRastreamento : String
+    - transportadora : String
+    - dataDespacho : DateTime
+    - dataEntregaEfetiva : DateTime
+    + registrarEntrega(data : DateTime) : void
+}
+
+class EvidenciaDisputa {
+    + hashArquivo : String
+    - urlArmazenamento : String
+    - tipoMime : String
+    - dataUpload : DateTime
+}
+
+Pedido "1\n+pedidoVinculado" -down-> "1\n+custodiaFinanceira" ContaCustodia
+Pedido "1\n+pedido" -down-> "0..*\n+despachoPostal" Envio
+Disputa "1\n+dossieDisputa" *-down-> "0..*\n+evidenciasAnexadas" EvidenciaDisputa
+
+' ==========================================
+' NOTAS EXPLICATIVAS (Posicionadas estrategicamente)
+' ==========================================
+note bottom of Anuncio
+  **RN01 (Antiscalping):**
+  Se precoVenda > 1.15 * mediana,
+  taxa sobe progressivamente.
+end note
+
+note bottom of ContaCustodia
+  **RN02 / RN04 (Custódia):**
+  Valor fica retido até confirmação
+  do comprador ou decurso de 48h.
+end note
+
+note right of EvidenciaDisputa
+  **RN03 / RN05:**
+  Abertura restrita a 48h pós-entrega.
+  Obrigatório anexar ao menos 1 evidência.
+end note
+
+' ==========================================
+' ENUMERAÇÕES
+' ==========================================
+package "Tipos Enumerados" <<Rectangle>> {
+    enum EstadoConservacao {
+        NOVO
+        USADO_EXCELENTE
+        USADO_BOM
+        COM_DEFEITO
+    }
+    enum StatusAnuncio {
+        RASCUNHO
+        ATIVO
+        PAUSADO
+        VENDIDO
+    }
+    enum StatusPedido {
+        AGUARDANDO_ENVIO
+        ENVIADO
+        ENTREGUE
+        EM_DISPUTA
+        CONCLUIDO
+        CANCELADO
+    }
+    enum StatusCustodia {
+        RETIDA
+        CONGELADA_DISPUTA
+        LIQUIDADA_VENDEDOR
+        ESTORNADA_COMPRADOR
+    }
+    enum MotivoDisputa {
+        DEFEITO_FUNCIONAL
+        DANO_TRANSPORTE
+        ITEM_DIVERGENTE
+    }
+    enum StatusDisputa {
+        ABERTA
+        EM_ANALISE
+        AGUARDANDO_PROVAS
+        ENCERRADA
+    }
+    enum VereditoDisputa {
+        PENDENTE
+        FAVORAVEL_COMPRADOR
+        FAVORAVEL_VENDEDOR
+    }
+    enum RoleUsuario {
+    ADMIN
+    CLIENTE
+    }
+}
+@enduml
