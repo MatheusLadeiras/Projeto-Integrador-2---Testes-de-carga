@@ -1,5 +1,5 @@
 -- ============================================================
--- Popula toda o banco de dados com 2000 intâncias de Usuáios, 1000 anúncios, 1000 modelos de hardware,
+-- Popula todo o banco de dados com 2000 instâncias de Usuários, 1000 anúncios, 1000 modelos de hardware,
 -- 1000 categorias, 500 pedidos, 1000 disputas, 1000 evidências, 1000 envios , 1000 contas custodias
 -- Essa massa de dados foi criada a fim de popular a tabela para testes, assim ela não necessariamente segue certas especificações do sistema final
 -- tal qual apenas permitir usuários "admin" para a moderação de disputas pois a única preocupação é criar uma massa de dados para os Testes de carga
